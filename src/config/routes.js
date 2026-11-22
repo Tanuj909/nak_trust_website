@@ -1,0 +1,18 @@
+export const routes = {
+  home: '/',
+  about: '/about',
+  schemes: '/schemes',
+  niyamawali: '/niyamawali',
+  members: '/members',
+  registration: '/member-registration',
+  login: '/member-login',
+  dashboard: '/member-dashboard',
+  cooperation: '/sahyog-suchi',
+  applications: '/welfare-applications',
+  news: '/news',
+  team: '/our-team',
+  gallery: '/gallery',
+  contact: '/contact',
+  privacy: '/privacy-policy',
+  terms: '/terms-and-conditions',
+}
