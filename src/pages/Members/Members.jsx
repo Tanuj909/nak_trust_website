@@ -8,37 +8,7 @@ import { useEffect, useState } from 'react'
 import { upDistricts } from '../../data/districts'
 import { useLanguage } from '../../i18n/LanguageContext'
 import { publicService, getMediaUrl } from '../../api'
-
-const categoryDisplayMap = {
-  A: {
-    hi: 'संवर्ग A (Government)',
-    en: 'Category A (Government)',
-  },
-  B: {
-    hi: 'संवर्ग B (Private)',
-    en: 'Category B (Private)',
-  },
-  C: {
-    hi: 'संवर्ग C (Professional)',
-    en: 'Category C (Professional)',
-  },
-  D: {
-    hi: 'संवर्ग D (Others)',
-    en: 'Category D (Others)',
-  },
-}
-
-function getCategoryBadge(category, isHindi) {
-  const code = (category || 'A').toString().toUpperCase().trim()
-  const found = categoryDisplayMap[code]
-  return {
-    label: found 
-      ? (isHindi ? found.hi : found.en) 
-      : (isHindi ? `संवर्ग ${category}` : `Category ${category}`),
-    bg: '#dbeafe',
-    color: '#1e40af',
-  }
-}
+import { getCategoryBadge } from '../../utils/category'
 
 export default function Members() {
   const { isHindi } = useLanguage()

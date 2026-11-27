@@ -127,25 +127,24 @@ img {
 }
 
 /* ========================================================
-   TOP NOTIFICATION BAR & EXECUTIVE TOPBAR
+   TOP NOTIFICATION BAR & EXECUTIVE TOPBAR (STICKY ON SCROLL)
    ======================================================== */
 .topbar {
   background: var(--primary-950);
   color: #d1dfed;
   font-size: 12.5px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  position: relative;
-  z-index: 40;
+  position: sticky;
+  top: 0;
+  z-index: 110;
 }
 
 .topbar-inner {
-  min-height: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: 12px;
-  padding: 4px 0;
 }
 
 .topbar-info {
@@ -294,15 +293,12 @@ img {
 }
 
 /* ========================================================
-   MASTER BRAND HEADER
+   MASTER BRAND HEADER (SCROLLS AWAY WITH PAGE)
    ======================================================== */
 .site-header {
   background: #ffffff;
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  box-shadow: var(--shadow-md);
-  border-bottom: 2px solid #eef3f9;
+  position: relative;
+  border-bottom: 1px solid #edf2f7;
 }
 
 .header-main {
@@ -481,12 +477,21 @@ img {
   place-items: center;
 }
 
+.mobile-drawer-header {
+  display: none;
+}
+
 /* ========================================================
-   NAVIGATION BAR
+   NAVIGATION BAR (STICKY TABS NAVBAR ON SCROLL - BELOW TOPBAR)
    ======================================================== */
 .main-nav {
   background: #ffffff;
   border-top: 1px solid #edf2f7;
+  border-bottom: 2px solid #eef3f9;
+  position: sticky;
+  top: 40px;
+  z-index: 100;
+  box-shadow: 0 4px 14px rgba(12, 35, 64, 0.08);
 }
 
 .nav-container {
@@ -672,7 +677,18 @@ img {
   color: var(--emerald-400);
 }
 
-/* Hero Right: Live Urgent Campaign Feature Card */
+/* Hero Right: Image & Campaign Card */
+.hero-image {
+  width: 100%;
+  height: auto;
+  max-height: 460px;
+  object-fit: cover;
+  border-radius: var(--radius-xl);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: block;
+}
+
 .hero-campaign-card {
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -1864,123 +1880,267 @@ img {
 /* ========================================================
    PRINT STYLES (PDF & PAPER PRINT SUPPORT)
    ======================================================== */
+/* Print root container (hidden on screen, visible only when printing modal/card) */
+#print-root {
+  display: none;
+}
+
 @media print {
-  body * {
-    visibility: hidden;
-  }
-  .printable-area, .printable-area * {
-    visibility: visible;
-  }
-  .printable-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    box-shadow: none !important;
-  }
-  .no-print {
-    display: none !important;
+  @page {
+    size: A4 portrait;
+    margin: 10mm 15mm;
   }
 
-  /* Exact Standard Aadhaar / CR80 / ISO ID-1 Physical Dimensions: 85.60 mm x 53.98 mm */
-  .digital-id-card {
-    width: 85.60mm !important;
-    height: 53.98mm !important;
-    min-width: 85.60mm !important;
-    min-height: 53.98mm !important;
-    max-width: 85.60mm !important;
-    max-height: 53.98mm !important;
-    aspect-ratio: 85.60 / 53.98 !important;
-    border-radius: 3.18mm !important;
-    border: 0.4mm solid #b45309 !important;
-    box-shadow: none !important;
-    box-sizing: border-box !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
+  /* ----------------------------------------------------
+     DEDICATED MODAL & CARD PRINTING (EXACTLY 1 PAGE)
+     ---------------------------------------------------- */
+  body.printing-id-card,
+  body.printing-receipt {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Completely remove the multi-page website from the print layout tree */
+  body.printing-id-card #root,
+  body.printing-receipt #root {
+    display: none !important;
+    height: 0 !important;
+    max-height: 0 !important;
     overflow: hidden !important;
+    visibility: hidden !important;
+  }
+
+  /* Only display the isolated single-card portal */
+  body.printing-id-card #print-root,
+  body.printing-receipt #print-root {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-after: avoid !important;
+    break-before: avoid !important;
+  }
+
+  body.printing-id-card #print-root *,
+  body.printing-receipt #print-root * {
+    visibility: visible !important;
+  }
+
+  /* Center the ID Card cleanly on 1 page */
+  body.printing-id-card .printable-area-container {
+    width: 100% !important;
     display: flex !important;
     flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 40px auto 0 auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* Full readable card printing without clipping or multi-page spilling */
+  body.printing-id-card .digital-id-card {
+    width: 480px !important;
+    max-width: 480px !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    aspect-ratio: auto !important;
+    margin: 0 auto !important;
+    border: 2px solid #b45309 !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    display: flex !important;
+    flex-direction: column !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.printing-id-card .id-card-top-strip {
+    height: 4px !important;
+    background: linear-gradient(90deg, #ff9933 0%, #ffffff 50%, #138808 100%) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.printing-id-card .id-card-header {
+    background: #0c2340 !important;
+    color: #ffffff !important;
+    padding: 10px 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.printing-id-card .id-card-emblem {
+    width: 32px !important;
+    height: 32px !important;
+    background: #ffffff !important;
+    border-radius: 50% !important;
+    display: grid !important;
+    place-items: center !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.printing-id-card .id-card-header-titles h4 {
+    font-size: 13px !important;
+    font-weight: 900 !important;
+    color: #ffffff !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
+  }
+
+  body.printing-id-card .id-card-header-titles small {
+    font-size: 10px !important;
+    color: #fde68a !important;
+    display: block !important;
+    line-height: 1.2 !important;
+  }
+
+  body.printing-id-card .id-card-body {
+    padding: 12px 14px !important;
+    display: grid !important;
+    grid-template-columns: 90px 1fr !important;
+    gap: 12px !important;
+    background: #ffffff !important;
+  }
+
+  body.printing-id-card .id-card-photo-box {
+    width: 90px !important;
+    height: 114px !important;
+    border: 2px solid #0c2340 !important;
+    border-radius: 6px !important;
+    overflow: hidden !important;
+    background: #f1f5f9 !important;
+    display: grid !important;
+    place-items: center !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.printing-id-card .id-card-photo-box img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    display: block !important;
+  }
+
+  body.printing-id-card .id-card-details {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3.5px !important;
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+  }
+
+  body.printing-id-card .id-card-detail-row {
+    display: flex !important;
     justify-content: space-between !important;
+    gap: 8px !important;
+    border-bottom: 1px dashed #cbd5e1 !important;
+    padding-bottom: 2px !important;
+  }
+
+  body.printing-id-card .id-card-detail-row span:first-child {
+    color: #64748b !important;
+    font-weight: 600 !important;
+  }
+
+  body.printing-id-card .id-card-detail-row strong {
+    color: #0c2340 !important;
+    text-align: right !important;
+  }
+
+  body.printing-id-card .id-card-footer {
+    background: #f8fafc !important;
+    border-top: 1px solid #e2e8f0 !important;
+    padding: 8px 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    font-size: 10px !important;
+    color: #475569 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  .id-card-top-strip {
-    height: 0.8mm !important;
+  body.printing-id-card .id-card-hologram {
+    width: 24px !important;
+    height: 24px !important;
+    background: #fef3c7 !important;
+    border: 1px solid #b45309 !important;
+    border-radius: 50% !important;
+    display: grid !important;
+    place-items: center !important;
+    color: #b45309 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  .id-card-header {
-    padding: 1.2mm 2.5mm !important;
-    gap: 1.8mm !important;
+  /* Receipt Printing */
+  body.printing-receipt .printable-area-container {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    margin: 20px auto !important;
+  }
+
+  body.printing-receipt .receipt-paper {
+    width: 100% !important;
+    max-width: 640px !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* ----------------------------------------------------
+     FALLBACK PRINT RULES FOR GENERAL STATIC PAGES
+     ---------------------------------------------------- */
+  body:not(.printing-id-card):not(.printing-receipt) {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #000000 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  .id-card-emblem {
-    width: 5.5mm !important;
-    height: 5.5mm !important;
-  }
-
-  .id-card-emblem svg {
-    width: 3.8mm !important;
-    height: 3.8mm !important;
-  }
-
-  .id-card-header-titles h4 {
-    font-size: 6.5pt !important;
-    line-height: 1.1 !important;
-  }
-
-  .id-card-header-titles small {
-    font-size: 5pt !important;
-    line-height: 1.1 !important;
-  }
-
-  .id-card-body {
-    padding: 1.2mm 2.5mm !important;
-    grid-template-columns: 16mm 1fr !important;
-    gap: 2mm !important;
-  }
-
-  .id-card-photo-box {
-    width: 16mm !important;
-    height: 20mm !important;
-    border-radius: 0.8mm !important;
-    border-width: 0.3mm !important;
-  }
-
-  .id-card-details {
-    gap: 0.3mm !important;
-    font-size: 4.8pt !important;
-    line-height: 1.1 !important;
-  }
-
-  .id-card-detail-row {
-    padding-bottom: 0.2mm !important;
-  }
-
-  .id-card-footer {
-    padding: 0.8mm 2.5mm !important;
-    font-size: 4.5pt !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  .id-card-footer svg {
-    width: 5mm !important;
-    height: 5mm !important;
-  }
-
-  .id-card-hologram {
-    width: 5mm !important;
-    height: 5mm !important;
-    font-size: 3.5pt !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+  body:not(.printing-id-card):not(.printing-receipt) header.site-header,
+  body:not(.printing-id-card):not(.printing-receipt) footer.site-footer,
+  body:not(.printing-id-card):not(.printing-receipt) .top-bar,
+  body:not(.printing-id-card):not(.printing-receipt) .ticker-bar,
+  body:not(.printing-id-card):not(.printing-receipt) .floating-actions,
+  body:not(.printing-id-card):not(.printing-receipt) .language-prompt-modal,
+  .no-print, .no-print * {
+    display: none !important;
+    visibility: hidden !important;
   }
 }
 
@@ -2012,30 +2172,163 @@ img {
 }
 
 @media (max-width: 768px) {
+  html, body {
+    overflow-x: hidden;
+  }
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 110;
+  }
+  .topbar-inner {
+    height: auto;
+    min-height: 36px;
+    padding: 4px 0;
+    gap: 6px;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+  }
+  .topbar-info {
+    gap: 6px;
+    flex-wrap: nowrap;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .topbar-item.highlight {
+    display: none;
+  }
+  .topbar-item {
+    font-size: 10.5px;
+    gap: 4px;
+    white-space: nowrap;
+    line-height: 1.2;
+  }
+  .topbar-right {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .language-switcher {
+    padding: 2px 4px;
+    gap: 3px;
+  }
+  .language-switcher button {
+    padding: 2px 6px;
+    font-size: 10.5px;
+  }
+  .topbar-actions {
+    display: none;
+  }
+  .ticker-bar {
+    padding: 8px 0;
+    margin-bottom: 10px;
+  }
+  .ticker-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .ticker-content {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .ticker-second-item {
+    display: none;
+  }
+  .site-header {
+    position: sticky;
+    top: 36px;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .header-main {
+    min-height: 62px;
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding: 10px 0;
+  }
+  .brand {
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+  }
+  .brand-emblem {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+  .brand-emblem svg {
+    width: 21px;
+    height: 21px;
+  }
+  .brand-text {
+    min-width: 0;
+    flex: 1;
+  }
+  .brand-title-hindi {
+    font-size: clamp(14px, 4.2vw, 18px);
+    line-height: 1.2;
+  }
+  .brand-title-en {
+    font-size: 9.5px;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .brand-meta {
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 9.5px;
+  }
   .mobile-menu-toggle {
     display: grid;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
   }
   .header-quick-ctas {
     display: none;
   }
   .main-nav {
     display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: #ffffff;
+    overflow-y: auto;
+    padding-bottom: 24px;
   }
   .main-nav.is-open {
     display: block;
-    border-top: 1px solid var(--slate-200);
+  }
+  .mobile-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0 10px;
+    border-bottom: 1px solid var(--slate-200);
+    margin-bottom: 6px;
+  }
+  .nav-container {
+    flex-direction: column;
+    align-items: stretch;
   }
   .nav-links {
     flex-direction: column;
     align-items: flex-start;
-    padding: 10px 0;
+    padding: 8px 0;
+    width: 100%;
   }
   .nav-item {
     width: 100%;
   }
   .nav-item a {
     width: 100%;
-    padding: 12px 16px;
+    padding: 11px 14px;
+    font-size: 14px;
   }
   .quick-services-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -2054,12 +2347,160 @@ img {
   }
   .verify-widget-box {
     grid-template-columns: 1fr;
+    padding: 24px 18px;
+    gap: 20px;
   }
   .form-grid-2, .form-grid-3 {
     grid-template-columns: 1fr;
   }
   .transparency-flow {
     grid-template-columns: 1fr;
+  }
+  .container {
+    padding: 0 14px;
+  }
+  .section {
+    padding: 48px 0;
+  }
+  .section-title {
+    font-size: 22px;
+    line-height: 1.3;
+  }
+  .hero-section {
+    padding: 36px 0 56px;
+  }
+  .hero-headline {
+    font-size: clamp(24px, 6.8vw, 34px);
+    line-height: 1.25;
+  }
+  .hero-subheadline {
+    font-size: 14px;
+  }
+  .hero-actions {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+  }
+  .hero-actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+  .hero-image {
+    max-height: 250px !important;
+  }
+  .quick-services-bar {
+    margin-top: -22px;
+    padding: 14px !important;
+  }
+  .table-header-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+  }
+  .floating-actions {
+    right: 12px;
+    bottom: 16px;
+    gap: 8px;
+  }
+  .floating-btn {
+    width: 42px;
+    height: 42px;
+  }
+}
+
+@media (max-width: 640px) {
+  .verify-input-group {
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+  }
+  .verify-input-group input {
+    width: 100%;
+    min-width: 0;
+    padding: 10px 12px;
+  }
+  .verify-input-group button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Mobile S (320px - 400px) */
+@media (max-width: 400px) {
+  .container {
+    padding: 0 10px;
+  }
+  .topbar-item {
+    font-size: 9.8px;
+    gap: 3px;
+  }
+  .topbar-item svg {
+    width: 11px;
+    height: 11px;
+    flex-shrink: 0;
+  }
+  .language-switcher .lang-globe {
+    display: none;
+  }
+  .language-switcher button {
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+  .brand-emblem {
+    width: 36px;
+    height: 36px;
+  }
+  .brand-emblem svg {
+    width: 19px;
+    height: 19px;
+  }
+  .brand-title-hindi {
+    font-size: 13.5px;
+  }
+  .brand-meta span:not(.brand-reg-pill) {
+    display: none;
+  }
+  .hero-section {
+    padding: 26px 0 44px;
+  }
+  .hero-headline {
+    font-size: 22px;
+  }
+  .hero-subheadline {
+    font-size: 13px;
+  }
+  .hero-motto-strip {
+    font-size: 11.5px;
+    padding: 8px 10px;
+  }
+  .hero-trust-badge {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
+  .quick-services-bar {
+    padding: 10px !important;
+    margin-top: -16px;
+  }
+  .quick-service-card {
+    padding: 10px;
+    gap: 10px;
+  }
+  .section {
+    padding: 36px 0;
+  }
+  .section-title {
+    font-size: 19px;
+  }
+  .section-subtitle {
+    font-size: 13px;
+  }
+  .scheme-card,
+  .category-card {
+    padding: 18px 14px;
+  }
+  .verify-widget-box {
+    padding: 18px 14px;
   }
 }
 

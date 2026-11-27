@@ -26,7 +26,7 @@ export default function Schemes() {
         '100% Direct Bank Transfer (DBT) model operating on strict 0% intermediary fee.'
       ],
       actionText: isHindi ? 'आश्रित सहायता आवेदन करें' : 'Apply for Demise Relief',
-      actionLink: routes.applications
+      actionLink: `${routes.applications}?scheme=death`
     },
     {
       id: 'kanyadaan',
@@ -47,7 +47,7 @@ export default function Schemes() {
         'Mutual gifts and wedding grants from statewide brethren are transferred directly to member bank account.'
       ],
       actionText: isHindi ? 'कन्यादान सहायता आवेदन करें' : 'Apply for Kanyadaan Aid',
-      actionLink: routes.applications
+      actionLink: `${routes.applications}?scheme=kanyadaan`
     },
     {
       id: 'medical',
@@ -66,7 +66,7 @@ export default function Schemes() {
         'Direct disbursement made to the hospital or member for immediate lifesaving interventions.'
       ],
       actionText: isHindi ? 'चिकित्सा सहायता आवेदन करें' : 'Apply for Medical Aid',
-      actionLink: routes.applications
+      actionLink: `${routes.applications}?scheme=medical`
     }
   ]
 

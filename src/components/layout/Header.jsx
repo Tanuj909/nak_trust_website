@@ -1,6 +1,6 @@
 import { CreditCard, HeartHandshake, LogIn, LogOut, Menu, Shield, UserCheck, UserPlus, X } from 'lucide-react'
 import { useState } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { navigation } from '../../config/navigation'
 import { routes } from '../../config/routes'
 import { siteConfig } from '../../config/site'
@@ -8,12 +8,11 @@ import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../i18n/LanguageContext'
 import { getMediaUrl, memberService } from '../../api'
 import LanguageSwitcher from '../common/LanguageSwitcher'
-import DonateModal from '../common/DonateModal'
+import { triggerDonateFlow } from '../common/DonateChoiceModal'
 import DigitalIdCard from '../common/DigitalIdCard'
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [showDonateModal, setShowDonateModal] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [showIdCardModal, setShowIdCardModal] = useState(false)
   const [cardData, setCardData] = useState(null)
@@ -22,6 +21,7 @@ export default function Header() {
   const { user, isAuthenticated, logout } = useAuth()
   const { isHindi } = useLanguage()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const closeMenu = () => setMobileMenuOpen(false)
 
@@ -55,7 +55,7 @@ export default function Header() {
   }
 
   const memberForCard = {
-    id: cardData?.member_code || user?.membership?.member_code || user?.member_code || (user?.id ? `NSCT-${user.id}` : 'NSCT-MEMBER'),
+    id: cardData?.member_code || user?.membership?.member_code || user?.member_code || (user?.id ? `NSCT-2026-M${user.id}` : 'NSCT-2026'),
     name: cardData?.name || user?.name || (isHindi ? 'सत्यापित सदस्य' : 'Verified Member'),
     fatherHusband: cardData?.father_husband_name || user?.profile?.father_husband_name || '',
     category: cardData?.category || user?.profile?.category || 'A',
@@ -67,7 +67,7 @@ export default function Header() {
     nomineeRelation: cardData?.nominee_relation || user?.profile?.nominee_relation || '',
     status: isHindi ? 'सत्यापित सक्रिय सदस्य (Active)' : 'Verified Active Member',
     joinDate: cardData?.joined_at || user?.membership?.joined_at || '',
-    avatar: getMediaUrl(cardData?.photo_url || user?.image_url),
+    avatar: getMediaUrl(cardData?.photo_url || user?.profile?.photo || user?.image_url),
   }
 
   return (
@@ -83,8 +83,7 @@ export default function Header() {
               <span className="brand-title-hindi">{siteConfig.hindiName}</span>
               <span className="brand-title-en">{siteConfig.name}</span>
               <div className="brand-meta">
-                <span className="brand-reg-pill">{siteConfig.regNo.split(' ')[0] || 'Reg 130/2025'}</span>
-                <span>• Govt. Registered Public Welfare Trust</span>
+                <span>Govt. Registered Public Welfare Trust</span>
               </div>
             </div>
           </Link>
@@ -93,7 +92,7 @@ export default function Header() {
             <button
               type="button"
               className="button button-gold button-small"
-              onClick={() => setShowDonateModal(true)}
+              onClick={() => triggerDonateFlow(navigate, isAuthenticated)}
             >
               <HeartHandshake size={16} /> Donate Now
             </button>
@@ -139,10 +138,35 @@ export default function Header() {
             {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
+      </header>
 
-        <nav className={`main-nav ${mobileMenuOpen ? 'is-open' : ''}`}>
-          <div className="container nav-container">
-            <ul className="nav-links">
+      {/* STICKY NAVIGATION TABS BAR (VISIBLE ON SCROLL) */}
+      <nav className={`main-nav no-print ${mobileMenuOpen ? 'is-open' : ''}`}>
+        <div className="container nav-container">
+          <div className="mobile-drawer-header">
+            <span style={{ fontWeight: 800, fontSize: '15px', color: '#0c2340' }}>
+              {isHindi ? 'मुख्य मेनू' : 'Navigation Menu'}
+            </span>
+            <button
+              type="button"
+              onClick={closeMenu}
+              aria-label="Close navigation menu"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 8,
+                background: '#f1f5f9',
+                color: '#0c2340',
+                display: 'grid',
+                placeItems: 'center',
+                border: '1px solid #cbd5e1',
+                cursor: 'pointer',
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <ul className="nav-links">
               {navigation.map((item) => (
                 <li key={item.key} className="nav-item">
                   <NavLink
@@ -157,6 +181,17 @@ export default function Header() {
                   </NavLink>
                 </li>
               ))}
+              {isAuthenticated && (
+                <li key="my-aid-applications" className="nav-item">
+                  <NavLink
+                    to={`${routes.dashboard}?tab=applications`}
+                    className={() => (location.pathname === routes.dashboard && location.search.includes('tab=applications') ? 'active' : '')}
+                    onClick={closeMenu}
+                  >
+                    {isHindi ? 'मेरे सहायता आवेदन' : 'My Aid Applications'}
+                  </NavLink>
+                </li>
+              )}
             </ul>
 
             <div style={{ padding: '12px 0', display: mobileMenuOpen ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
@@ -168,7 +203,7 @@ export default function Header() {
                 className="button button-gold button-small"
                 onClick={() => {
                   closeMenu()
-                  setShowDonateModal(true)
+                  triggerDonateFlow(navigate, isAuthenticated)
                 }}
               >
                 <HeartHandshake size={16} /> Donate Now
@@ -208,7 +243,6 @@ export default function Header() {
             </div>
           </div>
         </nav>
-      </header>
 
       {/* FULL DIGITAL E-CARD MODAL (CLICKED FROM HEADER) */}
       {showIdCardModal && (
@@ -252,8 +286,6 @@ export default function Header() {
           </div>
         </div>
       )}
-
-      <DonateModal isOpen={showDonateModal} onClose={() => setShowDonateModal(false)} />
     </>
   )
 }

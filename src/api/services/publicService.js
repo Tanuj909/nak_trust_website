@@ -28,12 +28,22 @@ export const publicService = {
   },
 
   /**
-   * Public directory of active registered members (privacy-protected: member_code omitted).
+   * Public directory of active registered members.
    *
    * @param {object} [params]
    */
   getPublicMembers(params = {}) {
     return axiosClient.get(ENDPOINTS.PUBLIC.MEMBERS_DIRECTORY, { params })
+  },
+
+  /**
+   * Public verification and retrieval of a member's Digital E-Card by Member Code or Phone.
+   *
+   * @param {string|number} identifier
+   */
+  verifyMemberECard(identifier) {
+    const clean = encodeURIComponent(String(identifier).trim())
+    return axiosClient.get(ENDPOINTS.PUBLIC.VERIFY_MEMBER_ECARD(clean))
   },
 
   /**
@@ -70,6 +80,25 @@ export const publicService = {
    */
   submitContact(payload) {
     return axiosClient.post(ENDPOINTS.PUBLIC.CONTACT, payload)
+  },
+
+  /**
+   * Submit mutual welfare assistance application (Demise, Kanyadaan, Medical) with optional documents.
+   *
+   * @param {FormData|object} payload
+   */
+  submitWelfareApplication(payload) {
+    return axiosClient.post(ENDPOINTS.PUBLIC.WELFARE_APPLICATIONS, payload)
+  },
+
+  /**
+   * Track live status of a welfare assistance application by application reference number.
+   *
+   * @param {string} applicationNumber
+   */
+  trackWelfareApplication(applicationNumber) {
+    const cleanNumber = String(applicationNumber).trim()
+    return axiosClient.get(ENDPOINTS.PUBLIC.TRACK_WELFARE_APPLICATION(cleanNumber))
   },
 }
 

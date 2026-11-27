@@ -1,11 +1,13 @@
 import { ArrowUp, HeartHandshake, MessageCircle } from 'lucide-react'
-import { useState } from 'react'
-import DonateModal from './DonateModal'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../i18n/LanguageContext'
+import { triggerDonateFlow } from './DonateChoiceModal'
 
 export default function FloatingActions() {
   const { isHindi } = useLanguage()
-  const [showDonate, setShowDonate] = useState(false)
+  const { isAuthenticated } = useAuth()
+  const navigate = useNavigate()
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -16,38 +18,33 @@ export default function FloatingActions() {
   }
 
   return (
-    <>
-      <div className="floating-actions no-print">
-        <button
-          className="floating-btn floating-donate-btn"
-          onClick={() => setShowDonate(true)}
-          title={isHindi ? 'तुरंत सहयोग करें' : 'Donate Now'}
-          aria-label="Donate"
-        >
-          <HeartHandshake size={24} />
-        </button>
+    <div className="floating-actions no-print">
+      <button
+        className="floating-btn floating-donate-btn"
+        onClick={() => triggerDonateFlow(navigate, isAuthenticated)}
+        title={isHindi ? 'तुरंत सहयोग करें' : 'Donate Now'}
+        aria-label="Donate"
+      >
+        <HeartHandshake size={24} />
+      </button>
 
-        <button
-          className="floating-btn floating-whatsapp-btn"
-          onClick={openWhatsApp}
-          title={isHindi ? 'WhatsApp हेल्पलाइन' : 'WhatsApp Helpline'}
-          aria-label="WhatsApp"
-        >
-          <MessageCircle size={24} />
-        </button>
+      <button
+        className="floating-btn floating-whatsapp-btn"
+        onClick={openWhatsApp}
+        title={isHindi ? 'WhatsApp हेल्पलाइन' : 'WhatsApp Helpline'}
+        aria-label="WhatsApp"
+      >
+        <MessageCircle size={24} />
+      </button>
 
-        <button
-          className="floating-btn floating-top-btn"
-          onClick={scrollToTop}
-          title={isHindi ? 'ऊपर जाएं' : 'Scroll to top'}
-          aria-label="Scroll to top"
-        >
-          <ArrowUp size={22} />
-        </button>
-      </div>
-
-      <DonateModal isOpen={showDonate} onClose={() => setShowDonate(false)} />
-    </>
+      <button
+        className="floating-btn floating-top-btn"
+        onClick={scrollToTop}
+        title={isHindi ? 'ऊपर जाएं' : 'Scroll to top'}
+        aria-label="Scroll to top"
+      >
+        <ArrowUp size={22} />
+      </button>
+    </div>
   )
 }
-

@@ -48,9 +48,9 @@ export default function Footer() {
           <ul className="footer-links">
             <li><Link to={routes.registration}>New Member Registration</Link></li>
             <li><Link to={routes.login}>Member Portal Login</Link></li>
-            <li><Link to={routes.applications}>Untimely Demise Aid Form</Link></li>
-            <li><Link to={routes.applications}>Kanyadaan Yojana Form</Link></li>
-            <li><Link to={routes.applications}>Medical Assistance Form</Link></li>
+            <li><Link to={`${routes.applications}?scheme=death`}>Untimely Demise Aid Form</Link></li>
+            <li><Link to={`${routes.applications}?scheme=kanyadaan`}>Kanyadaan Yojana Form</Link></li>
+            <li><Link to={`${routes.applications}?scheme=medical`}>Medical Assistance Form</Link></li>
             <li><Link to={routes.terms}>Terms & Conditions</Link></li>
             <li><Link to={routes.privacy}>Privacy Policy</Link></li>
           </ul>
@@ -68,7 +68,7 @@ export default function Footer() {
             <Phone size={18} />
             <div>
               <p>Helpline: <strong>{siteConfig.helpline}</strong></p>
-              <p>Toll Free: <strong>{siteConfig.tollFree}</strong> (9:00 AM - 6:00 PM)</p>
+              {/* <p>Toll Free: <strong>{siteConfig.tollFree}</strong> (9:00 AM - 6:00 PM)</p> */}
             </div>
           </div>
           <div className="footer-contact-item">

@@ -1,0 +1,735 @@
+import {
+  AlertCircle,
+  ArrowRight,
+  Building2,
+  CheckCircle,
+  Clock,
+  Copy,
+  HeartHandshake,
+  Home as HomeIcon,
+  Loader2,
+  LogIn,
+  QrCode,
+  User,
+  UserPlus,
+} from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { getMediaUrl, publicService } from '../../api'
+import { routes } from '../../config/routes'
+import { useAuth } from '../../context/AuthContext'
+import { useLanguage } from '../../i18n/LanguageContext'
+
+export default function Donate() {
+  const { isHindi } = useLanguage()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const campaign = location.state?.campaign || null
+
+  // 1: Amount & Details, 2: QR & Bank, 3: UTR & Screenshot, 4: Submitted
+  const [step, setStep] = useState(1)
+  const [amount, setAmount] = useState(100)
+  const [customAmount, setCustomAmount] = useState('')
+  const [donorName, setDonorName] = useState('')
+  const [email, setEmail] = useState('')
+  const [mobile, setMobile] = useState('')
+  const [district, setDistrict] = useState('लखनऊ (Lucknow)')
+  const [category, setCategory] = useState('B')
+  const [isAnonymous, setIsAnonymous] = useState(false)
+
+  // Active QR & Bank state from backend API (No fallbacks)
+  const [activeQr, setActiveQr] = useState(null)
+  const [loadingQr, setLoadingQr] = useState(true)
+  const [qrError, setQrError] = useState('')
+
+  // Verification fields
+  const [utrCode, setUtrCode] = useState('')
+  const [screenshotFile, setScreenshotFile] = useState(null)
+  const [screenshotPreview, setScreenshotPreview] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submissionId, setSubmissionId] = useState('')
+  const [copiedUpi, setCopiedUpi] = useState(false)
+
+  // Validation and API errors
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [submitError, setSubmitError] = useState('')
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [step])
+
+  useEffect(() => {
+    if (user) {
+      if (user.name) setDonorName(user.name)
+      if (user.email) setEmail(user.email)
+      if (user.phone) setMobile(user.phone)
+      if (user.profile?.district) setDistrict(user.profile.district)
+      if (user.profile?.category) setCategory(user.profile.category)
+    }
+  }, [user])
+
+  // Fetch live active Trust QR & Bank Details from API
+  useEffect(() => {
+    const fetchActiveQr = async () => {
+      setLoadingQr(true)
+      setQrError('')
+      try {
+        const res = await publicService.getActiveQr()
+        if (res?.data) {
+          setActiveQr(res.data)
+        } else {
+          setActiveQr(null)
+          setQrError(
+            isHindi
+              ? 'वर्तमान में कोई सक्रिय ट्रस्ट QR कोड उपलब्ध नहीं है।'
+              : 'No active Trust QR configuration is currently available.'
+          )
+        }
+      } catch (err) {
+        setActiveQr(null)
+        setQrError(
+          isHindi
+            ? 'ट्रस्ट QR एवं बैंक विवरण लोड करने में असमर्थ। कृपया बाद में पुनः प्रयास करें।'
+            : 'Unable to load Trust QR & Bank details from server. Please try again later.'
+        )
+      } finally {
+        setLoadingQr(false)
+      }
+    }
+
+    fetchActiveQr()
+  }, [isHindi])
+
+  const handleAmountClick = (val) => {
+    setAmount(val)
+    setCustomAmount('')
+  }
+
+  const handleCustomChange = (e) => {
+    setCustomAmount(e.target.value)
+    setAmount(Number(e.target.value) || 0)
+  }
+
+  const handleProceedToQR = (e) => {
+    e.preventDefault()
+    if (!donorName.trim() || !mobile.trim()) {
+      alert(isHindi ? 'कृपया अपना नाम और मोबाइल नंबर दर्ज करें!' : 'Please enter your name and mobile number!')
+      return
+    }
+    if (amount < 1) {
+      alert(isHindi ? 'कृपया कम से कम ₹1 की सहयोग राशि दर्ज करें।' : 'Please enter a donation amount of at least ₹1.')
+      return
+    }
+    setStep(2)
+  }
+
+  const handleScreenshotChange = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert(isHindi ? 'स्क्रीनशॉट 2MB से कम होना चाहिए।' : 'Screenshot must be less than 2MB.')
+        return
+      }
+      setScreenshotFile(file)
+      setScreenshotPreview(URL.createObjectURL(file))
+      setFieldErrors((prev) => ({ ...prev, screenshot: null }))
+    }
+  }
+
+  const handleFinalSubmit = async (e) => {
+    e.preventDefault()
+    setSubmitError('')
+    setFieldErrors({})
+
+    if (!utrCode.trim() || utrCode.trim().length < 4) {
+      setSubmitError(
+        isHindi ? 'कृपया वैध ट्रांजेक्शन कोड / UTR नंबर दर्ज करें।' : 'Please enter a valid transaction reference / UTR number.'
+      )
+      return
+    }
+
+    if (!screenshotFile) {
+      setSubmitError(isHindi ? 'कृपया भुगतान का स्क्रीनशॉट अपलोड करें।' : 'Please upload the payment screenshot.')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const formData = new FormData()
+      formData.append('donor_name', donorName.trim())
+      if (email.trim()) formData.append('donor_email', email.trim())
+      formData.append('donor_phone', mobile.trim())
+      formData.append('amount', amount)
+      formData.append('transaction_id', utrCode.trim())
+      if (category) formData.append('category', category)
+      if (district) formData.append('district', district)
+      formData.append('is_anonymous', isAnonymous ? '1' : '0')
+      formData.append('screenshot', screenshotFile)
+
+      const res = await publicService.submitDonation(formData)
+      const savedDonation = res?.data?.donation || res?.data || {}
+
+      setSubmissionId(savedDonation.id ? `SUB-${savedDonation.id}` : `SUB-${Date.now().toString().slice(-6)}`)
+      setStep(4)
+    } catch (err) {
+      if (err.status === 422 && err.errors) {
+        setFieldErrors(err.errors)
+        setSubmitError(
+          err.message ||
+            (isHindi
+              ? 'सत्यापन विफल रहा। कृपया नीचे दी गई त्रुटियों को सुधारें।'
+              : 'Validation failed. Please correct the highlighted fields.')
+        )
+      } else {
+        setSubmitError(
+          err.message ||
+            (isHindi
+              ? 'सहयोग सबमिट करने में असमर्थ। कृपया इंटरनेट कनेक्शन या UTR कोड जांचें।'
+              : 'Unable to submit donation. Please check your connection or UTR number.')
+        )
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const copyUpiId = () => {
+    if (!activeQr?.upi_id) return
+    navigator.clipboard.writeText(activeQr.upi_id)
+    setCopiedUpi(true)
+    setTimeout(() => setCopiedUpi(false), 2500)
+  }
+
+  return (
+    <div className="section section-alt" style={{ minHeight: '85vh', padding: '44px 0 64px' }}>
+      <div className="container" style={{ maxWidth: '680px' }}>
+        {/* Page Top Header */}
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <span className="section-eyebrow">
+            <HeartHandshake size={16} /> {isHindi ? 'प्रत्यक्ष जनसहयोग पोर्टल' : 'Direct Mutual Contribution'}
+          </span>
+          <h1 className="section-title" style={{ marginTop: '6px', marginBottom: '6px' }}>
+            {isHindi ? 'Direct Mutual Contribution / स्वैच्छिक जनसहयोग' : 'Direct Mutual Contribution'}
+          </h1>
+          <p className="section-subtitle" style={{ margin: '0 auto' }}>
+            {campaign ? campaign.title : 'NAK Trust - National Self Care Team Mutual Welfare Fund'}
+          </p>
+        </div>
+
+        {/* Main Card */}
+        <div className="form-card" style={{ padding: '28px 26px', borderRadius: '16px' }}>
+          {/* STEP 0: GUEST OR REGISTER / LOGIN CHOICE (FOR GUEST USERS ONLY) */}
+          {step === 0 && (
+            <div>
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#fef3c7', color: '#b45309', display: 'grid', placeItems: 'center', margin: '0 auto 12px' }}>
+                  <HeartHandshake size={28} />
+                </div>
+                <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0c2340', marginBottom: '6px' }}>
+                  {isHindi ? 'सहयोग करने का माध्यम चुनें' : 'Choose How to Donate'}
+                </h2>
+                <p style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.55, maxWidth: '460px', margin: '0 auto' }}>
+                  {isHindi
+                    ? 'सदस्य के रूप में लॉगिन या पंजीकरण करके सहयोग करने पर आपकी रसीद व योगदान इतिहास आपके खाते में सुरक्षित रहता है।'
+                    : 'Logging in or registering links your contribution receipt and donation history directly to your member profile.'}
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Option 1: Register or Login (Then Donate) */}
+                <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '18px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#0c2340', marginBottom: '4px' }}>
+                    {isHindi ? 'पंजीकरण या लॉगिन करें (फिर सहयोग करें)' : 'Register or Login (Then Donate)'}
+                  </div>
+                  <p style={{ fontSize: '12.5px', color: '#475569', marginBottom: '14px', lineHeight: 1.5 }}>
+                    {isHindi
+                      ? 'यदि आप पहले से सदस्य हैं तो लॉगिन करें, या नए सदस्य के रूप में जुड़कर सहयोग करें।'
+                      : 'Sign in to your existing member account or register as a new member before donating.'}
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      onClick={() => navigate(routes.login)}
+                      style={{ justifyContent: 'center', gap: '6px', padding: '11px 14px', fontSize: '13.5px' }}
+                    >
+                      <LogIn size={16} />
+                      <span>{isHindi ? 'लॉगिन करें' : 'Login'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-gold"
+                      onClick={() => navigate(routes.registration)}
+                      style={{ justifyContent: 'center', gap: '6px', padding: '11px 14px', fontSize: '13.5px' }}
+                    >
+                      <UserPlus size={16} />
+                      <span>{isHindi ? 'पंजीकरण करें' : 'Register'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#94a3b8', fontSize: '12px', fontWeight: 700 }}>
+                  <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                  <span>{isHindi ? 'अथवा' : 'OR'}</span>
+                  <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                </div>
+
+                {/* Option 2: Continue as Guest */}
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  style={{
+                    width: '100%',
+                    padding: '15px 18px',
+                    borderRadius: '12px',
+                    border: '1.5px solid #b45309',
+                    background: '#fffbeb',
+                    color: '#92400e',
+                    fontWeight: 800,
+                    fontSize: '14.5px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <User size={18} />
+                    <span>{isHindi ? 'अतिथि के रूप में जारी रखें (Continue as Guest)' : 'Continue as Guest'}</span>
+                  </span>
+                  <ArrowRight size={18} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 1: AMOUNT & DONOR DETAILS */}
+          {step === 1 && (
+            <div>
+              {campaign && (
+                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '18px', fontSize: '12.5px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: '#64748b' }}>{isHindi ? 'Nominee / आश्रित:' : 'Beneficiary Nominee:'}</span>
+                    <strong>{campaign.nomineeName}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b' }}>{isHindi ? 'Bank / खाता:' : 'Nominee Bank Account:'}</span>
+                    <strong style={{ color: '#047857' }}>{campaign.nomineeAccount} ({campaign.nomineeIfsc})</strong>
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={handleProceedToQR}>
+                <div className="form-group">
+                  <label className="form-label">{isHindi ? 'Select Contribution Amount (सहयोग राशि):' : 'Select Contribution Amount:'}</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '10px' }}>
+                    {[50, 100, 200, 500].map((val) => (
+                      <button
+                        type="button"
+                        key={val}
+                        onClick={() => handleAmountClick(val)}
+                        style={{
+                          padding: '10px 4px',
+                          borderRadius: '8px',
+                          border: amount === val && !customAmount ? '2px solid #b45309' : '1px solid #cbd5e1',
+                          background: amount === val && !customAmount ? '#fef3c7' : '#ffffff',
+                          color: amount === val && !customAmount ? '#92400e' : '#1e293b',
+                          fontWeight: 800,
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ₹{val}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder={isHindi ? 'Enter other custom amount (₹ अन्य राशि)' : 'Enter custom amount in ₹'}
+                    value={customAmount}
+                    onChange={handleCustomChange}
+                    min="1"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">{isHindi ? 'Donor Full Name (आपका नाम):' : 'Donor Full Name:'} <span className="req">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    className="form-control"
+                    placeholder={isHindi ? 'उदा. रमेश कुमार' : 'e.g. Ramesh Kumar'}
+                    value={donorName}
+                    onChange={(e) => setDonorName(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">{isHindi ? 'Mobile Number:' : 'Mobile Number:'} <span className="req">*</span></label>
+                    <input
+                      type="tel"
+                      required
+                      maxLength={10}
+                      className="form-control"
+                      placeholder="10 digit mobile"
+                      value={mobile}
+                      onChange={(e) => setMobile(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">{isHindi ? 'Email (वैकल्पिक):' : 'Email Address (Optional):'}</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      placeholder="name@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">{isHindi ? 'District (जनपद):' : 'District:'}</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder={isHindi ? 'उदा. लखनऊ / गोरखपुर' : 'e.g. Lucknow / Gorakhpur'}
+                      value={district}
+                      onChange={(e) => setDistrict(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">{isHindi ? 'Category (संवर्ग):' : 'Membership Category:'}</label>
+                    <select
+                      className="form-control form-select"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                    >
+                      <option value="A">संवर्ग A (Government)</option>
+                      <option value="B">संवर्ग B (Private)</option>
+                      <option value="C">संवर्ग C (Professional)</option>
+                      <option value="D">संवर्ग D (Others)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button type="submit" className="button button-gold" style={{ width: '100%', padding: '12px', marginTop: 10 }}>
+                  {isHindi ? `भुगतान विकल्प देखें (₹${amount}) →` : `Proceed to Payment (₹${amount}) →`}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* STEP 2: LIVE API TRUST QR & BANK DETAILS */}
+          {step === 2 && (
+            <div>
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <span className="badge-pill" style={{ background: '#fef3c7', color: '#92400e', fontSize: '11px', fontWeight: 800 }}>
+                  {isHindi ? 'चरण 2/3: QR कोड एवं बैंक विवरण' : 'Step 2 of 3: Scan UPI QR & Bank Details'}
+                </span>
+                <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0c2340', marginTop: 6 }}>
+                  {isHindi ? 'भुगतान विकल्प (UPI QR एवं बैंक खाता)' : 'Payment Options (UPI QR & Bank Transfer)'}
+                </h3>
+                <p style={{ fontSize: '13px', color: '#64748b' }}>
+                  {isHindi ? 'सहयोग राशि: ' : 'Payment Amount: '}<strong style={{ color: '#047857', fontSize: '16px' }}>₹{amount}</strong>
+                </p>
+              </div>
+
+              {loadingQr ? (
+                <div style={{ textAlign: 'center', padding: '36px 20px', color: '#64748b' }}>
+                  <Loader2 size={34} style={{ animation: 'spin 1s linear infinite', color: '#b45309', margin: '0 auto 10px' }} />
+                  <p style={{ fontSize: '13px', fontWeight: 600 }}>
+                    {isHindi ? 'ट्रस्ट QR एवं बैंक विवरण लोड हो रहे हैं...' : 'Loading active Trust QR & Bank details...'}
+                  </p>
+                </div>
+              ) : qrError || !activeQr ? (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 18, textAlign: 'center', color: '#991b1b', marginBottom: 18 }}>
+                  <AlertCircle size={28} style={{ margin: '0 auto 8px' }} />
+                  <p style={{ fontSize: '13px', fontWeight: 700, margin: 0 }}>
+                    {qrError || (isHindi ? 'कोई सक्रिय QR कॉन्फ़िगरेशन उपलब्ध नहीं है।' : 'No active Trust QR configuration available.')}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* QR Code Card (Purely from API) */}
+                  <div style={{ maxWidth: '380px', margin: '0 auto 16px', background: '#f8fafc', border: '2px dashed #b45309', borderRadius: 12, padding: 18, textAlign: 'center' }}>
+                    <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>
+                      {activeQr.title}
+                    </span>
+
+                    <div style={{ background: '#ffffff', padding: 12, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: 170, minWidth: 170, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                      {activeQr.qr_image_url ? (
+                        <img
+                          src={getMediaUrl(activeQr.qr_image_url)}
+                          alt={activeQr.title}
+                          style={{ maxHeight: '170px', maxWidth: '170px', objectFit: 'contain' }}
+                        />
+                      ) : (
+                        <QrCode size={145} style={{ color: '#0c2340' }} />
+                      )}
+                    </div>
+
+                    {activeQr.upi_id && (
+                      <div style={{ marginTop: 12 }}>
+                        <p style={{ fontSize: '13px', fontWeight: 800, color: '#047857', marginBottom: 6 }}>
+                          UPI ID: {activeQr.upi_id}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={copyUpiId}
+                          style={{ fontSize: '11.5px', color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 700 }}
+                        >
+                          <Copy size={12} /> {copiedUpi ? (isHindi ? 'UPI कॉपी हुआ!' : 'UPI Copied!') : (isHindi ? 'UPI आईडी कॉपी करें' : 'Copy UPI ID')}
+                        </button>
+                      </div>
+                    )}
+
+                    <small style={{ fontSize: '11px', color: '#64748b', display: 'block', marginTop: 8 }}>
+                      {isHindi ? 'GPay, PhonePe, Paytm, BHIM द्वारा स्कैन करें' : 'Scan with GPay, PhonePe, Paytm, BHIM'}
+                    </small>
+                  </div>
+
+                  {/* Official Bank Details Card from API */}
+                  {activeQr.bank_details && (
+                    <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 12, padding: '14px 16px', marginBottom: 18 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '12.5px', fontWeight: 800, color: '#0c2340', marginBottom: 6 }}>
+                        <Building2 size={15} style={{ color: '#b45309' }} />
+                        <span>{isHindi ? 'आधिकारिक ट्रस्ट बैंक खाता विवरण (NEFT / IMPS / RTGS)' : 'Official Trust Bank Account Details'}</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '12.5px', color: '#334155', lineHeight: 1.6, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+                        {activeQr.bank_details}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Payment Completed Button */}
+              <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', padding: 14, borderRadius: 10, marginBottom: 16, textAlign: 'center' }}>
+                <p style={{ fontSize: '12.5px', color: '#065f46', fontWeight: 700, marginBottom: 10 }}>
+                  {isHindi
+                    ? `क्या आपने ₹${amount} का भुगतान कर दिया है?`
+                    : `Have you completed the payment of ₹${amount}?`}
+                </p>
+                <button
+                  type="button"
+                  className="button button-gold"
+                  style={{ width: '100%', padding: '12px', fontSize: '14px' }}
+                  onClick={() => setStep(3)}
+                >
+                  <CheckCircle size={17} /> {isHindi ? 'Payment Completed / Success (मैंने भुगतान कर दिया है)' : 'Payment Completed / Success'}
+                </button>
+              </div>
+
+              <div style={{ textAlign: 'center' }}>
+                <button
+                  type="button"
+                  className="button button-outline button-small"
+                  onClick={() => setStep(1)}
+                >
+                  ← {isHindi ? 'पिछला' : 'Back'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: TRANSACTION CODE & SCREENSHOT UPLOAD */}
+          {step === 3 && (
+            <div>
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <span className="badge-pill" style={{ background: '#dbeafe', color: '#1e40af', fontSize: '11px', fontWeight: 800 }}>
+                  {isHindi ? 'चरण 3/3: सत्यापन विवरण' : 'Step 3 of 3: Verification Details'}
+                </span>
+                <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0c2340', marginTop: 6 }}>
+                  {isHindi ? 'लेन-देन कोड दर्ज करें एवं स्क्रीनशॉट अपलोड करें' : 'Enter Transaction Code & Upload Screenshot'}
+                </h3>
+                <p style={{ fontSize: '12.5px', color: '#64748b' }}>
+                  {isHindi
+                    ? 'कृपया अपने भुगतान का 12-अंकों का UTR/Ref कोड एवं स्क्रीनशॉट अपलोड करें ताकि ट्रस्ट प्रशासन सत्यापन कर इसे स्वीकृत कर सके।'
+                    : 'Please enter your 12-digit UTR/Ref code and attach screenshot so Trust Administration can verify and approve it.'}
+                </p>
+              </div>
+
+              {submitError && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: 10, borderRadius: 6, fontSize: '12px', marginBottom: 14 }}>
+                  {submitError}
+                </div>
+              )}
+
+              <form onSubmit={handleFinalSubmit}>
+                <div className="form-group">
+                  <label className="form-label">
+                    {isHindi ? 'Transaction Code / UPI UTR / Bank Reference No:' : 'Transaction Reference Code / UPI UTR No:'} <span className="req">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="form-control"
+                    placeholder="508219482103 (12-digit UTR)"
+                    value={utrCode}
+                    onChange={(e) => {
+                      setUtrCode(e.target.value)
+                      setFieldErrors((prev) => ({ ...prev, transaction_id: null }))
+                    }}
+                  />
+                  {fieldErrors.transaction_id && (
+                    <span style={{ color: '#dc2626', fontSize: '11.5px', marginTop: 4, display: 'block' }}>
+                      {fieldErrors.transaction_id[0]}
+                    </span>
+                  )}
+                  <span className="form-hint">
+                    {isHindi ? 'आपके Google Pay, PhonePe, Paytm अथवा बैंक रसीद पर प्रदर्शित UTR नंबर।' : '12-digit UTR or Reference number shown on receipt.'}
+                  </span>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    {isHindi ? 'Upload Payment Screenshot (स्क्रीनशॉट अपलोड करें):' : 'Upload Payment Screenshot:'} <span className="req">*</span>
+                  </label>
+                  <div style={{ border: '2px dashed #cbd5e1', borderRadius: 8, padding: 14, textAlign: 'center', background: '#f8fafc' }}>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      required
+                      onChange={handleScreenshotChange}
+                      style={{ marginBottom: 10, fontSize: '12px' }}
+                    />
+                    {screenshotPreview && (
+                      <div style={{ marginTop: 8 }}>
+                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: 4 }}>
+                          {isHindi ? 'स्क्रीनशॉट प्रिव्यू (Preview):' : 'Screenshot Preview:'}
+                        </span>
+                        <img
+                          src={screenshotPreview}
+                          alt="Screenshot Preview"
+                          style={{ maxHeight: '140px', maxWidth: '100%', borderRadius: 6, margin: '0 auto', border: '1px solid #cbd5e1' }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  {fieldErrors.screenshot && (
+                    <span style={{ color: '#dc2626', fontSize: '11.5px', marginTop: 4, display: 'block' }}>
+                      {fieldErrors.screenshot[0]}
+                    </span>
+                  )}
+                </div>
+
+                {/* Anonymous Checkbox */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '12.5px', color: '#334155', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={isAnonymous}
+                      onChange={(e) => setIsAnonymous(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: '#b45309' }}
+                    />
+                    <span>
+                      {isHindi ? 'दानकर्ता का नाम सार्वजनिक सूची में गोपनीय (Anonymous) रखें' : 'Keep my identity anonymous on the public Sahyog Wall'}
+                    </span>
+                  </label>
+                </div>
+
+                <div style={{ background: '#fef3c7', padding: 10, borderRadius: 6, fontSize: '11.5px', color: '#92400e', marginBottom: 16 }}>
+                  <strong>{isHindi ? 'नोट: ' : 'Note: '}</strong>
+                  {isHindi
+                    ? 'सबमिट करने के उपरांत ट्रस्ट प्रशासन द्वारा कोड व स्क्रीनशॉट का मिलान कर इसे सत्यापित किया जाएगा।'
+                    : 'After submission, the Trust administration will review the transaction and record it in the official ledger.'}
+                </div>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    type="submit"
+                    className="button button-primary"
+                    style={{ flexGrow: 1, padding: '12px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                        <span>{isHindi ? 'सबमिट हो रहा है...' : 'Submitting...'}</span>
+                      </>
+                    ) : (
+                      <span>{isHindi ? 'सत्यापन हेतु सबमिट करें' : 'Submit for Verification'}</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    onClick={() => setStep(2)}
+                    disabled={isSubmitting}
+                  >
+                    {isHindi ? 'वापस जाएं' : 'Back'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* STEP 4: SUBMISSION CONFIRMATION */}
+          {step === 4 && (
+            <div style={{ textAlign: 'center', padding: '12px 0' }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#fef3c7', color: '#b45309', display: 'grid', placeItems: 'center', margin: '0 auto 12px' }}>
+                <Clock size={32} />
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#0c2340', marginBottom: 6 }}>
+                {isHindi ? 'भुगतान सत्यापन हेतु सबमिट हुआ' : 'Payment Submitted for Verification'}
+              </h3>
+              <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.6, marginBottom: 16 }}>
+                {isHindi ? 'आपके भुगतान का UTR कोड एवं स्क्रीनशॉट सफलतापूर्वक दर्ज कर लिया गया है।' : 'Your UTR reference and payment screenshot have been recorded successfully.'}
+              </p>
+
+              <div style={{ background: '#f8fafc', border: '1px dashed #b45309', borderRadius: 10, padding: 14, display: 'inline-block', marginBottom: 18, textAlign: 'left', minWidth: '280px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 4 }}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>{isHindi ? 'सबमिशन आईडी:' : 'Submission ID:'}</span>
+                  <strong style={{ fontFamily: 'monospace', color: '#b45309' }}>{submissionId}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 4 }}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>{isHindi ? 'राशि:' : 'Amount:'}</span>
+                  <strong style={{ color: '#047857' }}>₹{amount}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 4 }}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>{isHindi ? 'UTR कोड:' : 'UTR Code:'}</span>
+                  <code style={{ fontSize: '12px' }}>{utrCode}</code>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>{isHindi ? 'समीक्षा स्थिति:' : 'Review Status:'}</span>
+                  <span style={{ color: '#d97706', fontWeight: 800, fontSize: '12px' }}>● {isHindi ? 'समीक्षाधीन (Pending Review)' : 'Pending Review'}</span>
+                </div>
+              </div>
+
+              <div style={{ background: '#ecfdf5', padding: 10, borderRadius: 8, fontSize: '12px', color: '#065f46', marginBottom: 20 }}>
+                {isHindi
+                  ? '✓ ट्रस्ट प्रशासन द्वारा सत्यापन होते ही यह सहयोग सूची में प्रदर्शित हो जाएगा।'
+                  : '✓ Once verified by the Trust administration, this entry will reflect on the live Public Sahyog List.'}
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                <Link to={routes.home} className="button button-gold" style={{ flex: 1, justifyContent: 'center' }}>
+                  <HomeIcon size={16} /> {isHindi ? 'मुख्य पृष्ठ पर जाएं' : 'Back to Home'}
+                </Link>
+                <button
+                  type="button"
+                  className="button button-outline"
+                  onClick={() => {
+                    setUtrCode('')
+                    setScreenshotFile(null)
+                    setScreenshotPreview(null)
+                    setStep(1)
+                  }}
+                >
+                  {isHindi ? 'पुनः सहयोग करें' : 'Donate Again'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+

@@ -1,4 +1,4 @@
-import { Calendar, PhoneCall, ShieldCheck, UserCheck } from 'lucide-react'
+import { Calendar, PhoneCall, UserCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { routes } from '../../config/routes'
 import { siteConfig } from '../../config/site'
@@ -18,11 +18,8 @@ export default function TopBar() {
     <div className="topbar no-print">
       <div className="container topbar-inner">
         <div className="topbar-info">
-          <span className="topbar-item highlight">
-            <ShieldCheck size={14} /> Reg. No. {siteConfig.regNo.split(' ')[0] || '130/2025'}
-          </span>
           <span className="topbar-item">
-            <PhoneCall size={13} /> Helpline: <strong>{siteConfig.helpline}</strong> (Toll Free: {siteConfig.tollFree})
+            <PhoneCall size={13} /> Helpline: <strong>{siteConfig.helpline}</strong> 
           </span>
           <span className="topbar-item" style={{ display: 'none', lg: 'inline-flex' }}>
             <Calendar size={13} /> {today}

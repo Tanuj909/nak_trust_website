@@ -28,7 +28,6 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { getMediaUrl, memberService } from '../../api'
 import DigitalIdCard from '../../components/common/DigitalIdCard'
-import DonateModal from '../../components/common/DonateModal'
 import { routes } from '../../config/routes'
 import { siteConfig } from '../../config/site'
 import { useAuth } from '../../context/AuthContext'
@@ -41,15 +40,15 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Navigation tab: 'overview', 'ecard', 'donations'
+  // Navigation tab: 'overview', 'ecard', 'donations', 'applications'
   const [dashboardTab, setDashboardTab] = useState('overview')
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
-  // Listen to tab query param if navigated with ?tab=ecard
+  // Listen to tab query param if navigated with ?tab=ecard or ?tab=applications
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const tabParam = params.get('tab')
-    if (tabParam && ['overview', 'ecard', 'donations'].includes(tabParam)) {
+    if (tabParam && ['overview', 'ecard', 'donations', 'applications'].includes(tabParam)) {
       setDashboardTab(tabParam)
     }
   }, [location.search])
@@ -77,8 +76,12 @@ export default function Dashboard() {
   const [loadingDonations, setLoadingDonations] = useState(false)
   const [donationsError, setDonationsError] = useState('')
 
-  // Donate Modal State
-  const [donateCampaign, setDonateCampaign] = useState(null)
+  // Live Welfare Applications State
+  const [applications, setApplications] = useState([])
+  const [loadingApplications, setLoadingApplications] = useState(false)
+  const [applicationsError, setApplicationsError] = useState('')
+  const [selectedApplication, setSelectedApplication] = useState(null)
+  const [downloadingDocId, setDownloadingDocId] = useState(null)
 
   // Profile Photo Upload & Lightbox State
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
@@ -149,11 +152,28 @@ export default function Dashboard() {
     }
   }
 
+  // 4. Fetch Welfare Applications when switching to applications tab
+  const fetchLiveApplications = async () => {
+    setLoadingApplications(true)
+    setApplicationsError('')
+    try {
+      const res = await memberService.getMyWelfareApplications()
+      const list = res?.data?.data?.data || res?.data?.data || []
+      setApplications(Array.isArray(list) ? list : [])
+    } catch (err) {
+      setApplicationsError(err.message || (isHindi ? 'सहायता आवेदन लोड करने में त्रुटि हुई।' : 'Failed to fetch welfare applications.'))
+    } finally {
+      setLoadingApplications(false)
+    }
+  }
+
   useEffect(() => {
     if (dashboardTab === 'ecard') {
       fetchLiveCard()
     } else if (dashboardTab === 'donations') {
       fetchLiveDonations()
+    } else if (dashboardTab === 'applications') {
+      fetchLiveApplications()
     }
   }, [dashboardTab])
 
@@ -314,6 +334,18 @@ export default function Dashboard() {
     status: isHindi ? 'सत्यापित सक्रिय सदस्य (Active)' : 'Verified Active Member',
     joinDate: cardData?.joined_at || profileData?.membership?.joined_at || '',
     avatar: getMediaUrl(cardData?.photo_url || avatarUrl),
+  }
+
+  // Handle document download for the selected application
+  const handleDownloadDocument = async (doc) => {
+    try {
+      setDownloadingDocId(doc.id)
+      await memberService.downloadWelfareDocument(doc.id, doc.file_name || `welfare_doc_${doc.id}`)
+    } catch (err) {
+      alert(isHindi ? 'दस्तावेज डाउनलोड करने में त्रुटि हुई।' : 'Failed to download document attachment.')
+    } finally {
+      setDownloadingDocId(null)
+    }
   }
 
   return (
@@ -565,6 +597,13 @@ export default function Dashboard() {
           >
             <CreditCard size={16} /> {isHindi ? 'मेरा सहयोग इतिहास' : 'My Donations History'}
           </button>
+          <button
+            type="button"
+            className={`button button-small ${dashboardTab === 'applications' ? 'button-gold' : 'button-outline'}`}
+            onClick={() => setDashboardTab('applications')}
+          >
+            <HeartHandshake size={16} /> {isHindi ? 'सहायता आवेदन (My Applications)' : 'My Aid Applications'}
+          </button>
         </div>
 
         {/* TAB 1: OVERVIEW & PROFILE */}
@@ -758,7 +797,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 className="button button-gold button-small"
-                onClick={() => setDonateCampaign(activeCampaigns[0])}
+                onClick={() => navigate(routes.donate, { state: { campaign: activeCampaigns[0] } })}
               >
                 <HeartHandshake size={15} /> {isHindi ? 'नया सहयोग भेजें' : 'Make a Contribution'}
               </button>
@@ -787,7 +826,7 @@ export default function Dashboard() {
                 <button
                   type="button"
                   className="button button-gold button-small"
-                  onClick={() => setDonateCampaign(activeCampaigns[0])}
+                  onClick={() => navigate(routes.donate, { state: { campaign: activeCampaigns[0] } })}
                 >
                   <HeartHandshake size={15} /> {isHindi ? 'सक्रिय अभियान में सहयोग करें' : 'Contribute to Active Campaign'}
                 </button>
@@ -855,7 +894,454 @@ export default function Dashboard() {
             )}
           </div>
         )}
+
+        {/* TAB 4: MY WELFARE ASSISTANCE APPLICATIONS */}
+        {dashboardTab === 'applications' && (
+          <div className="dashboard-section-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginBottom: 20 }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0c2340', marginBottom: 4 }}>
+                  {isHindi ? 'मेरे प्रस्तुत सहायता प्रपत्र (My Applied Aid Forms)' : 'My Applied Aid Forms'}
+                </h3>
+                <p style={{ fontSize: '13px', color: '#64748b' }}>
+                  {isHindi 
+                    ? 'संस्था में आपके द्वारा प्रस्तुत समस्त सहायता आवेदनों (दिवंगत/कन्यादान/चिकित्सा) का विवरण एवं अद्यतन स्थिति।' 
+                    : 'Read-only ledger of all assistance applications submitted under your membership.'}
+                </p>
+              </div>
+
+              <Link
+                to={routes.applications}
+                className="button button-gold button-small"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <HeartHandshake size={15} />
+                <span>{isHindi ? 'नया सहायता आवेदन करें' : 'Apply for Aid'}</span>
+              </Link>
+            </div>
+
+            {loadingApplications ? (
+              <div style={{ padding: '40px 0', textAlign: 'center', color: '#64748b' }}>
+                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
+                <p style={{ fontSize: '13px' }}>{isHindi ? 'आवेदन लोड हो रहे हैं...' : 'Loading applications...'}</p>
+              </div>
+            ) : applicationsError ? (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: 14, borderRadius: 8, fontSize: '13px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AlertCircle size={18} />
+                <span>{applicationsError}</span>
+              </div>
+            ) : applications.length === 0 ? (
+              <div style={{ padding: '40px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: 10, border: '1px dashed #cbd5e1' }}>
+                <HeartHandshake size={40} style={{ color: '#94a3b8', margin: '0 auto 12px' }} />
+                <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#334155', marginBottom: 6 }}>
+                  {isHindi ? 'कोई सहायता आवेदन नहीं मिला' : 'No Welfare Applications Found'}
+                </h4>
+                <p style={{ fontSize: '13px', color: '#64748b', maxWidth: '480px', margin: '0 auto 16px' }}>
+                  {isHindi 
+                    ? 'आपने अभी तक कोई सहायता आवेदन प्रस्तुत नहीं किया है। दिवंगत साथी, कन्यादान विवाह अथवा गंभीर चिकित्सा सहायता हेतु नया आवेदन कर सकते हैं।' 
+                    : 'You have not submitted any welfare assistance applications yet. You can apply for Demise Relief, Kanyadaan Marriage Grant, or Sanjeevani Medical Aid.'}
+                </p>
+                <Link to={routes.applications} className="button button-gold button-small">
+                  <HeartHandshake size={15} /> {isHindi ? 'आवेदन प्रपत्र खोलें' : 'Open Application Form'}
+                </Link>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ background: '#f1f5f9', color: '#334155', borderBottom: '2px solid #e2e8f0' }}>
+                      <th style={{ padding: '12px 14px' }}>{isHindi ? 'आवेदन सं.' : 'App No.'}</th>
+                      <th style={{ padding: '12px 14px' }}>{isHindi ? 'योजना' : 'Scheme'}</th>
+                      <th style={{ padding: '12px 14px' }}>{isHindi ? 'लाभार्थी / विवरण' : 'Beneficiary / Details'}</th>
+                      <th style={{ padding: '12px 14px' }}>{isHindi ? 'आवेदन तिथि' : 'Submitted Date'}</th>
+                      <th style={{ padding: '12px 14px' }}>{isHindi ? 'सत्यापन स्थिति' : 'Status'}</th>
+                      <th style={{ padding: '12px 14px' }}>{isHindi ? 'टिप्पणी' : 'Official Remarks'}</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'center' }}>{isHindi ? 'विवरण' : 'Action'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {applications.map((app) => {
+                      const statusStyle = 
+                        app.status === 'Approved' ? { background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' } :
+                        app.status === 'Under Review' ? { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' } :
+                        app.status === 'Rejected' ? { background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' } :
+                        { background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }
+
+                      const schemeLabel = 
+                        app.scheme_type === 'death' ? (isHindi ? 'दिवंगत आश्रित' : 'Demise Relief') :
+                        app.scheme_type === 'kanyadaan' ? (isHindi ? 'कन्यादान विवाह' : 'Kanyadaan Grant') :
+                        (isHindi ? 'संजीवनी चिकित्सा' : 'Sanjeevani Medical')
+
+                      const beneficiaryDesc = 
+                        app.scheme_type === 'death' ? `${app.deceased_name || ''} → ${app.nominee_name || ''}` :
+                        app.scheme_type === 'kanyadaan' ? `${app.daughter_name || ''} & ${app.groom_name || ''}` :
+                        `${app.patient_name || ''} (${app.disease_name || ''})`
+
+                      return (
+                        <tr key={app.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '12px 14px', fontFamily: 'monospace', fontWeight: 700, color: '#b45309' }}>
+                            {app.application_number}
+                          </td>
+                          <td style={{ padding: '12px 14px', fontWeight: 600 }}>
+                            <span style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '3px 8px', borderRadius: 4, fontSize: '11.5px' }}>
+                              {schemeLabel}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 14px', color: '#1e293b' }}>
+                            {beneficiaryDesc}
+                          </td>
+                          <td style={{ padding: '12px 14px', color: '#64748b' }}>
+                            {app.created_at ? new Date(app.created_at).toLocaleDateString(isHindi ? 'hi-IN' : 'en-IN') : 'N/A'}
+                          </td>
+                          <td style={{ padding: '12px 14px' }}>
+                            <span style={{ ...statusStyle, padding: '4px 10px', borderRadius: 12, fontWeight: 700, fontSize: '11.5px', display: 'inline-block' }}>
+                              ● {app.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 14px', color: '#475569', fontSize: '12px', maxWidth: '200px' }}>
+                            {app.admin_remarks || '—'}
+                          </td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              className="button button-small button-outline"
+                              onClick={() => setSelectedApplication(app)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 5,
+                                padding: '5px 12px',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                borderColor: '#0c2340',
+                                color: '#0c2340',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <Eye size={13} />
+                              <span>{isHindi ? 'प्रपत्र देखें' : 'View Form'}</span>
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* VIEW WELFARE APPLICATION DETAILS MODAL */}
+      {selectedApplication && (
+        <div className="modal-overlay" onClick={() => setSelectedApplication(null)} style={{ zIndex: 9999 }}>
+          <div 
+            className="modal-content" 
+            onClick={(e) => e.stopPropagation()} 
+            style={{ maxWidth: '780px', width: '95%', maxHeight: '92vh', overflowY: 'auto', padding: '28px 24px' }}
+          >
+            <button className="modal-close-btn" onClick={() => setSelectedApplication(null)} aria-label="Close">
+              <X size={18} />
+            </button>
+
+            {/* Modal Title & Reference Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, background: '#fef3c7', color: '#b45309', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                <HeartHandshake size={24} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0c2340', margin: 0 }}>
+                    {isHindi ? 'पारस्परिक कल्याण सहायता आवेदन पत्र' : 'Mutual Aid Application Details'}
+                  </h3>
+                  <span style={{ 
+                    background: '#f1f5f9', 
+                    color: '#0c2340', 
+                    fontSize: '11px', 
+                    fontWeight: 800, 
+                    padding: '2px 8px', 
+                    borderRadius: 4, 
+                    border: '1px solid #cbd5e1' 
+                  }}>
+                    {selectedApplication.scheme_type === 'death' ? (isHindi ? 'दिवंगत आश्रित राहत' : 'Demise Relief') :
+                     selectedApplication.scheme_type === 'kanyadaan' ? (isHindi ? 'कन्यादान विवाह अनुदान' : 'Kanyadaan Grant') :
+                     (isHindi ? 'संजीवनी चिकित्सा सहायता' : 'Sanjeevani Medical Aid')}
+                  </span>
+                </div>
+                <p style={{ fontSize: '12.5px', color: '#64748b', margin: '3px 0 0' }}>
+                  {isHindi ? 'आवेदन संदर्भ संख्या:' : 'Application Reference Number:'}{' '}
+                  <strong style={{ color: '#b45309', fontFamily: 'monospace', letterSpacing: '0.5px' }}>
+                    {selectedApplication.application_number}
+                  </strong>
+                </p>
+              </div>
+            </div>
+
+            {/* Status & Review Summary Banner */}
+            <div style={{
+              background: selectedApplication.status === 'Approved' ? '#ecfdf5' :
+                          selectedApplication.status === 'Under Review' ? '#eff6ff' :
+                          selectedApplication.status === 'Rejected' ? '#fef2f2' : '#fffbeb',
+              border: `1px solid ${selectedApplication.status === 'Approved' ? '#a7f3d0' :
+                                   selectedApplication.status === 'Under Review' ? '#bfdbfe' :
+                                   selectedApplication.status === 'Rejected' ? '#fecaca' : '#fde68a'}`,
+              borderRadius: 10,
+              padding: '14px 18px',
+              marginBottom: 22,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 12
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {selectedApplication.status === 'Approved' ? <CheckCircle2 size={20} style={{ color: '#059669' }} /> :
+                 selectedApplication.status === 'Under Review' ? <ShieldCheck size={20} style={{ color: '#2563eb' }} /> :
+                 selectedApplication.status === 'Rejected' ? <AlertCircle size={20} style={{ color: '#dc2626' }} /> :
+                 <Clock size={20} style={{ color: '#d97706' }} />}
+                <div>
+                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, display: 'block' }}>
+                    {isHindi ? 'वर्तमान सत्यापन स्थिति' : 'Current Verification Status'}
+                  </span>
+                  <strong style={{ 
+                    fontSize: '14px', 
+                    color: selectedApplication.status === 'Approved' ? '#047857' :
+                           selectedApplication.status === 'Under Review' ? '#1d4ed8' :
+                           selectedApplication.status === 'Rejected' ? '#b91c1c' : '#b45309' 
+                  }}>
+                    {selectedApplication.status === 'Approved' ? (isHindi ? 'स्वीकृत (Approved)' : 'Approved') :
+                     selectedApplication.status === 'Under Review' ? (isHindi ? 'जाँच प्रक्रियाधीन (Under Review)' : 'Under Review') :
+                     selectedApplication.status === 'Rejected' ? (isHindi ? 'अस्वीकृत (Rejected)' : 'Rejected') :
+                     (isHindi ? 'प्रतीक्षारत (Pending Verification)' : 'Pending Verification')}
+                  </strong>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', fontSize: '12px', color: '#64748b' }}>
+                <span>{isHindi ? 'आवेदन दर्ज करने की तिथि:' : 'Submitted On:'} </span>
+                <strong style={{ color: '#334155' }}>
+                  {selectedApplication.created_at ? new Date(selectedApplication.created_at).toLocaleString(isHindi ? 'hi-IN' : 'en-IN') : 'N/A'}
+                </strong>
+              </div>
+            </div>
+
+            {/* Official Administrative Remarks Banner */}
+            {selectedApplication.admin_remarks && (
+              <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: '12.5px', color: '#92400e' }}>
+                <strong>{isHindi ? 'प्रशासनिक सत्यापन टिप्पणी (Official Remarks):' : 'Official Remarks:'}</strong> {selectedApplication.admin_remarks}
+              </div>
+            )}
+
+            {/* Section 1: Member Credentials */}
+            <div style={{ marginBottom: 20 }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#0c2340', borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {isHindi ? '1. आवेदक सदस्य विवरण (Member Information)' : '1. Member Credentials'}
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, fontSize: '13px' }}>
+                <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'सदस्यता आईडी:' : 'Member ID:'}</span>
+                  <strong style={{ color: '#0c2340', fontFamily: 'monospace' }}>{selectedApplication.member_id}</strong>
+                </div>
+                <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'जनपद:' : 'District:'}</span>
+                  <strong style={{ color: '#0c2340' }}>{selectedApplication.district}</strong>
+                </div>
+                <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'पंजीकृत मोबाइल नंबर:' : 'Registered Mobile:'}</span>
+                  <strong style={{ color: '#0c2340' }}>{selectedApplication.mobile}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2: Scheme-Specific Details */}
+            <div style={{ marginBottom: 20 }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#0c2340', borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {selectedApplication.scheme_type === 'death' ? (isHindi ? '2. दिवंगत साथी एवं नॉमिनी विवरण (Demise Details)' : '2. Demise & Nominee Details') :
+                 selectedApplication.scheme_type === 'kanyadaan' ? (isHindi ? '2. कन्यादान विवाह विवरण (Wedding Details)' : '2. Daughter Wedding Details') :
+                 (isHindi ? '2. चिकित्सा एवं उपचार विवरण (Medical Treatment Details)' : '2. Medical & Treatment Details')}
+              </h4>
+
+              {/* DEMISE FIELDS */}
+              {selectedApplication.scheme_type === 'death' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, fontSize: '13px' }}>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'दिवंगत सदस्य का नाम:' : 'Deceased Member Name:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.deceased_name || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'देहावसान तिथि:' : 'Date of Demise:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.date_of_demise || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'मृत्यु का कारण:' : 'Cause of Demise:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.cause_of_demise || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'मृत्यु प्रमाण पत्र संख्या:' : 'Death Certificate No:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.death_cert_no || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'नामिती (Nominee) का नाम:' : 'Nominee Name:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.nominee_name || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'नामिती का सम्बंध:' : 'Relation with Deceased:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.nominee_relation || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'बैंक का नाम:' : 'Bank Name:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.nominee_bank || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'खाता संख्या:' : 'Account Number:'}</span>
+                    <strong style={{ color: '#0c2340', fontFamily: 'monospace' }}>{selectedApplication.nominee_account || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'IFSC कोड:' : 'IFSC Code:'}</span>
+                    <strong style={{ color: '#0c2340', fontFamily: 'monospace' }}>{selectedApplication.nominee_ifsc || '—'}</strong>
+                  </div>
+                </div>
+              )}
+
+              {/* KANYADAAN FIELDS */}
+              {selectedApplication.scheme_type === 'kanyadaan' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, fontSize: '13px' }}>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'पुत्री का नाम:' : 'Daughter Name:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.daughter_name || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'पुत्री की आयु:' : 'Daughter Age:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.daughter_age ? `${selectedApplication.daughter_age} वर्ष (Years)` : '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'वर का नाम:' : 'Groom Name:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.groom_name || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'वर के पिता का नाम:' : 'Groom Father:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.groom_father || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'विवाह तिथि:' : 'Wedding Date:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.wedding_date || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'विवाह स्थल / पता:' : 'Wedding Venue:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.wedding_venue || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'जिला टीम को आमंत्रण:' : 'District Team Invited:'}</span>
+                    <strong style={{ color: '#0c2340' }}>
+                      {selectedApplication.invited_district_team ? (isHindi ? 'हाँ (आमंत्रित)' : 'Yes (Invited)') : (isHindi ? 'नहीं' : 'No')}
+                    </strong>
+                  </div>
+                </div>
+              )}
+
+              {/* MEDICAL FIELDS */}
+              {selectedApplication.scheme_type === 'medical' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, fontSize: '13px' }}>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'रोगी का नाम:' : 'Patient Name:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.patient_name || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'रोगी से सम्बंध:' : 'Relation with Patient:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.patient_relation || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'गंभीर बीमारी का नाम:' : 'Illness / Disease:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.disease_name || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'अनुमानित उपचार व्यय:' : 'Estimated Cost:'}</span>
+                    <strong style={{ color: '#b45309', fontWeight: 800 }}>
+                      ₹{Number(selectedApplication.estimated_cost || 0).toLocaleString('en-IN')}
+                    </strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'चिकित्सालय का नाम:' : 'Hospital Name:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.hospital_name || '—'}</strong>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isHindi ? 'परामर्शदाता चिकित्सक:' : 'Attending Doctor:'}</span>
+                    <strong style={{ color: '#0c2340' }}>{selectedApplication.doctor_name || '—'}</strong>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Section 3: Attached Documents */}
+            <div style={{ marginBottom: 24 }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#0c2340', borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {isHindi ? '3. संलग्न साक्ष्य दस्तावेज (Attached Documents)' : '3. Attached Verification Documents'}
+              </h4>
+              {selectedApplication.documents && selectedApplication.documents.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {selectedApplication.documents.map((doc) => (
+                    <div 
+                      key={doc.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 14px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 8,
+                        fontSize: '12.5px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <FileText size={18} style={{ color: '#b45309' }} />
+                        <div>
+                          <strong style={{ color: '#0c2340', display: 'block' }}>
+                            {doc.document_label || doc.file_name}
+                          </strong>
+                          <span style={{ color: '#64748b', fontSize: '11px' }}>
+                            {doc.file_name} • {(Number(doc.file_size || 0) / 1024).toFixed(1)} KB
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="button button-small button-outline"
+                        disabled={downloadingDocId === doc.id}
+                        onClick={() => handleDownloadDocument(doc)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: '11.5px' }}
+                      >
+                        {downloadingDocId === doc.id ? (
+                          <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                        ) : (
+                          <Download size={13} />
+                        )}
+                        <span>{downloadingDocId === doc.id ? (isHindi ? 'डाउनलोडिंग...' : 'Downloading...') : (isHindi ? 'दस्तावेज देखें' : 'Download')}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ padding: '14px', background: '#f8fafc', borderRadius: 8, border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '12.5px', textAlign: 'center' }}>
+                  {isHindi ? 'इस आवेदन के साथ कोई दस्तावेज संलग्न नहीं है।' : 'No verification documents attached.'}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+              <button
+                type="button"
+                className="button button-primary button-small"
+                onClick={() => setSelectedApplication(null)}
+              >
+                {isHindi ? 'बंद करें (Close)' : 'Close Window'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* EDIT PROFILE MODAL */}
       {showEditModal && (
@@ -1051,13 +1537,6 @@ export default function Dashboard() {
           onClose={() => setShowIdCardModal(false)}
         />
       )}
-
-      {/* DONATE MODAL */}
-      <DonateModal
-        campaign={donateCampaign}
-        isOpen={Boolean(donateCampaign)}
-        onClose={() => setDonateCampaign(null)}
-      />
 
       {/* VIEW PROFILE PHOTO LIGHTBOX MODAL */}
       {showPhotoModal && avatarUrl && (

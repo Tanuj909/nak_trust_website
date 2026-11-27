@@ -4,6 +4,7 @@ import TickerBar from './TickerBar'
 import Header from './Header'
 import Footer from './Footer'
 import FloatingActions from '../common/FloatingActions'
+import DonateChoiceModal from '../common/DonateChoiceModal'
 import LanguagePromptModal from '../common/LanguagePromptModal'
 import ScrollToTop from '../common/ScrollToTop'
 
@@ -19,6 +20,7 @@ export default function MainLayout() {
       </main>
       <Footer />
       <FloatingActions />
+      <DonateChoiceModal />
       <LanguagePromptModal />
     </>
   )

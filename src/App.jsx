@@ -10,6 +10,7 @@ import Login from './pages/Login/Login'
 import Dashboard from './pages/Dashboard/Dashboard'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import Cooperation from './pages/Cooperation/Cooperation'
+import Donate from './pages/Donate/Donate'
 import Applications from './pages/Applications/Applications'
 import News from './pages/News/News'
 import Team from './pages/Team/Team'
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/death-sahyog-suchi" element={<Cooperation />} />
         <Route path="/kanyadaan-suchi" element={<Cooperation />} />
         <Route path="/sahyog-kare" element={<Cooperation />} />
+        <Route path="/donate" element={<Donate />} />
         <Route path="/welfare-applications" element={<Applications />} />
         <Route path="/apply" element={<Applications />} />
         <Route path="/news" element={<News />} />

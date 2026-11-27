@@ -20,7 +20,7 @@ export default function TickerBar() {
               : '★ Urgent Demise Relief: Support family of late member Ram Pratap Verma (Gorakhpur) directly in nominee\'s SBI account.'}
             <Link to={routes.cooperation}>{isHindi ? 'अपील विवरण देखें →' : 'View Appeal Details →'}</Link>
           </span>
-          <span style={{ marginLeft: '40px' }}>
+          <span className="ticker-second-item" style={{ marginLeft: '40px' }}>
             {isHindi
               ? '★ संवर्ग A, B, C एवं D हेतु ऑनलाइन सदस्यता पंजीकरण चालू है • पंजीकरण के तुरंत बाद डिजिटल स्मार्ट आईडी कार्ड प्राप्त करें।'
               : '★ Online Member Registration is Live for Category A, B, C & D • Download Digital Smart ID Card immediately after registration.'}

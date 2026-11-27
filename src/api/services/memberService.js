@@ -69,6 +69,36 @@ export const memberService = {
   getMyDonations(params = {}) {
     return axiosClient.get(ENDPOINTS.MEMBER.DONATIONS, { params })
   },
+
+  /**
+   * Fetch paginated list of welfare assistance applications submitted by the logged-in member.
+   *
+   * @param {object} [params]
+   */
+  getMyWelfareApplications(params = {}) {
+    return axiosClient.get(ENDPOINTS.MEMBER.WELFARE_APPLICATIONS, { params })
+  },
+
+  /**
+   * Download/stream an attached document for a welfare application submitted by the member.
+   *
+   * @param {number|string} documentId
+   * @param {string} fileName
+   */
+  async downloadWelfareDocument(documentId, fileName = 'document') {
+    const response = await axiosClient.get(ENDPOINTS.MEMBER.WELFARE_DOCUMENT(documentId), {
+      responseType: 'blob',
+    })
+    const blob = new Blob([response], { type: response.type || 'application/octet-stream' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', fileName)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  },
 }
 
 export default memberService

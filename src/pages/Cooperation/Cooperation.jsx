@@ -5,17 +5,21 @@ import {
   FileText, 
   HeartHandshake, 
   Loader2, 
+  Lock,
+  LogIn,
   Search, 
-  UserCheck 
+  UserCheck,
+  X 
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { publicService, memberService } from '../../api'
 import { useAuth } from '../../context/AuthContext'
 import { routes } from '../../config/routes'
-import DonateModal from '../../components/common/DonateModal'
+import { triggerDonateFlow } from '../../components/common/DonateChoiceModal'
 import PaymentReceiptModal from '../../components/common/PaymentReceiptModal'
 import { useLanguage } from '../../i18n/LanguageContext'
+import { formatCategory } from '../../utils/category'
 
 export default function Cooperation() {
   const { isHindi } = useLanguage()
@@ -24,7 +28,7 @@ export default function Cooperation() {
 
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedReceipt, setSelectedReceipt] = useState(null)
-  const [donateModalOpen, setDonateModalOpen] = useState(false)
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
 
   // Live Approved Donors State (Public Wall)
   const [approvedDonors, setApprovedDonors] = useState([])
@@ -91,7 +95,7 @@ export default function Cooperation() {
   // Handle My Contributions button click
   const handleMyContributionsClick = () => {
     if (!isAuthenticated) {
-      navigate(routes.memberLogin)
+      setShowLoginPrompt(true)
       return
     }
     setShowMyHistory((prev) => !prev)
@@ -102,7 +106,7 @@ export default function Cooperation() {
     if (!searchTerm.trim()) return true
     const term = searchTerm.toLowerCase()
     const nameMatch = (item.donor_name || '').toLowerCase().includes(term)
-    const categoryMatch = (item.category || '').toLowerCase().includes(term)
+    const categoryMatch = (item.category || '').toLowerCase().includes(term) || formatCategory(item.category, isHindi).toLowerCase().includes(term)
     const districtMatch = (item.district || '').toLowerCase().includes(term)
     const amountMatch = String(item.amount || '').includes(term)
     const idMatch = String(item.id || '').includes(term)
@@ -180,7 +184,7 @@ export default function Cooperation() {
               <button
                 type="button"
                 className="button button-gold button-small"
-                onClick={() => setDonateModalOpen(true)}
+                onClick={() => triggerDonateFlow(navigate, isAuthenticated)}
               >
                 <HeartHandshake size={15} /> {isHindi ? 'Contribute Now (सहयोग करें)' : 'Contribute Now'}
               </button>
@@ -248,7 +252,7 @@ export default function Cooperation() {
                         <button
                           type="button"
                           className="button button-gold button-small"
-                          onClick={() => setDonateModalOpen(true)}
+                          onClick={() => triggerDonateFlow(navigate, isAuthenticated)}
                         >
                           <HeartHandshake size={15} /> {isHindi ? 'सहयोग करें (Contribute Now)' : 'Contribute Now'}
                         </button>
@@ -268,8 +272,8 @@ export default function Cooperation() {
                           </td>
                           <td>
                             {item.category ? (
-                              <span style={{ fontSize: '11px', background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
-                                {String(item.category).startsWith('संवर्ग') || String(item.category).startsWith('Category') ? item.category : `संवर्ग ${item.category}`}
+                              <span style={{ fontSize: '11px', background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 4, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                {formatCategory(item.category, isHindi)}
                               </span>
                             ) : (
                               <span style={{ color: '#94a3b8', fontSize: '12px' }}>—</span>
@@ -374,7 +378,7 @@ export default function Cooperation() {
                         <button
                           type="button"
                           className="button button-gold button-small"
-                          onClick={() => setDonateModalOpen(true)}
+                          onClick={() => triggerDonateFlow(navigate, isAuthenticated)}
                         >
                           <HeartHandshake size={15} /> {isHindi ? 'पहला सहयोग करें (Contribute Now)' : 'Be the first to contribute'}
                         </button>
@@ -393,8 +397,8 @@ export default function Cooperation() {
                         </td>
                         <td>
                           {item.category ? (
-                            <span style={{ fontSize: '11px', background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
-                              {String(item.category).startsWith('संवर्ग') || String(item.category).startsWith('Category') ? item.category : `संवर्ग ${item.category}`}
+                            <span style={{ fontSize: '11px', background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 4, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                              {formatCategory(item.category, isHindi)}
                             </span>
                           ) : (
                             <span style={{ color: '#94a3b8', fontSize: '12px' }}>—</span>
@@ -439,14 +443,71 @@ export default function Cooperation() {
         />
       )}
 
-      <DonateModal
-        isOpen={donateModalOpen}
-        onClose={() => setDonateModalOpen(false)}
-        onSuccess={() => {
-          fetchApprovedDonors()
-          if (isAuthenticated) fetchMyDonations()
-        }}
-      />
+      {/* GUEST LOGIN PROMPT POPUP */}
+      {showLoginPrompt && (
+        <div className="modal-overlay" onClick={() => setShowLoginPrompt(false)}>
+          <div 
+            className="modal-content" 
+            onClick={(e) => e.stopPropagation()} 
+            style={{ maxWidth: '440px', textAlign: 'center', padding: '32px 28px' }}
+          >
+            <button 
+              type="button"
+              className="modal-close-btn" 
+              onClick={() => setShowLoginPrompt(false)} 
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              background: '#fef3c7',
+              color: '#b45309',
+              display: 'grid',
+              placeItems: 'center',
+              margin: '0 auto 16px',
+            }}>
+              <Lock size={26} />
+            </div>
+
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0c2340', marginBottom: 10 }}>
+              Login To See your Contribution!
+            </h3>
+
+            <p style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.6, marginBottom: 24 }}>
+              {isHindi
+                ? 'अपने व्यक्तिगत सहयोग का इतिहास, सत्यापन स्थिति एवं आधिकारिक रसीदें देखने हेतु कृपया अपने सदस्य खाते में लॉगिन करें।'
+                : 'Please log in to your verified member account to view your contribution history, approval status, and download official receipts.'}
+            </p>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="button button-outline button-small"
+                onClick={() => setShowLoginPrompt(false)}
+                style={{ minWidth: 100 }}
+              >
+                {isHindi ? 'रद्द करें' : 'Cancel'}
+              </button>
+
+              <button
+                type="button"
+                className="button button-gold button-small"
+                onClick={() => {
+                  setShowLoginPrompt(false)
+                  navigate(routes.login || '/member-login')
+                }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 140, justifyContent: 'center' }}
+              >
+                <LogIn size={15} /> {isHindi ? 'लॉगिन करें' : 'Login Now'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

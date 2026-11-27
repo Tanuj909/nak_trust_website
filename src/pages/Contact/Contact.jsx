@@ -148,7 +148,7 @@ export default function Contact() {
                 <div>
                   <strong style={{ fontSize: '13.5px', color: '#0c2340' }}>{isHindi ? 'हेल्पलाइन नम्बर:' : 'Helpline Numbers:'}</strong>
                   <p style={{ fontSize: '13px', color: '#475569', marginTop: 2 }}>
-                    <strong>{siteConfig.helpline}</strong> ({isHindi ? 'टोल फ्री: ' : 'Toll Free: '}{siteConfig.tollFree})
+                    <strong>{siteConfig.helpline}</strong>
                   </p>
                 </div>
               </div>

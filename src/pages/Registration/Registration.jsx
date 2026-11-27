@@ -19,8 +19,8 @@ import {
   UserPlus, 
   Users 
 } from 'lucide-react'
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { authService } from '../../api'
 import DigitalIdCard from '../../components/common/DigitalIdCard'
 import { routes } from '../../config/routes'
@@ -32,6 +32,11 @@ import { useLanguage } from '../../i18n/LanguageContext'
 export default function Registration() {
   const { isHindi } = useLanguage()
   const { login } = useAuth()
+  const [searchParams] = useSearchParams()
+  const categoryParam = searchParams.get('category')?.toUpperCase()
+  const validCategories = ['A', 'B', 'C', 'D']
+  const initialCategory = validCategories.includes(categoryParam) ? categoryParam : 'A'
+
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState({
     // Step 1: Personal
@@ -46,7 +51,7 @@ export default function Registration() {
     email: '',
 
     // Step 2: Category & Occupation
-    category: 'A',
+    category: initialCategory,
     departmentName: '',
     designation: '',
     employeeOrRegId: '',
@@ -91,6 +96,21 @@ export default function Registration() {
   const [fieldErrors, setFieldErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [showIdCardModal, setShowIdCardModal] = useState(false)
+  const [stepConfirmed, setStepConfirmed] = useState({
+    1: false,
+    2: false,
+    3: false,
+    4: false,
+    5: false,
+    6: false,
+  })
+
+  useEffect(() => {
+    const cat = searchParams.get('category')?.toUpperCase()
+    if (cat && ['A', 'B', 'C', 'D'].includes(cat)) {
+      setFormData((prev) => ({ ...prev, category: cat }))
+    }
+  }, [searchParams])
 
   // Handle district selection and populate blocks
   const selectedDistrictObj = upDistricts.find((d) => d.id === formData.district) || upDistricts[0]
@@ -164,6 +184,11 @@ export default function Registration() {
         return isHindi ? 'पासवर्ड और पुष्टि पासवर्ड मेल नहीं खाते।' : 'Passwords do not match.'
       if (!formData.agreeTerms)
         return isHindi ? 'पंजीकरण हेतु संस्था के नियमों व शर्तों की स्वीकृति अनिवार्य है।' : 'Acceptance of trust rules and terms is required.'
+    }
+    if (!stepConfirmed[step]) {
+      return isHindi
+        ? 'आगे बढ़ने से पहले कृपया पुष्टि चेकबॉक्स पर टिक करें कि दी गई जानकारी सही है।'
+        : 'Please tick the confirmation box to verify that the given information is correct before proceeding.'
     }
     return ''
   }
@@ -1198,13 +1223,53 @@ export default function Registration() {
               </div>
             )}
 
+            {/* Per-Step Recheck Confirmation Checkbox */}
+            <div
+              style={{
+                background: '#fffbeb',
+                border: '1px solid #fde68a',
+                borderRadius: '10px',
+                padding: '12px 16px',
+                marginTop: '24px',
+              }}
+            >
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  color: '#78350f',
+                  fontWeight: 600,
+                  lineHeight: 1.5,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={!!stepConfirmed[currentStep]}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    setStepConfirmed((prev) => ({ ...prev, [currentStep]: checked }))
+                    if (checked && errorMsg) setErrorMsg('')
+                  }}
+                  style={{ marginTop: 3, width: 17, height: 17, accentColor: '#d97706', cursor: 'pointer' }}
+                />
+                <span>
+                  {isHindi
+                    ? 'मैं पुष्टि करता/करती हूँ कि ऊपर दी गई सभी जानकारी सही है। कृपया आगे बढ़ने से पहले अपने विवरण की पुनः जांच कर लें।'
+                    : 'I confirm that the given information is correct. Please recheck all details carefully before going further.'}
+                </span>
+              </label>
+            </div>
+
             {/* Form Action Buttons */}
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginTop: '32px',
+                marginTop: '20px',
                 paddingTop: '20px',
                 borderTop: '1px solid #e2e8f0',
               }}
